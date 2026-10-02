@@ -1,0 +1,7 @@
+# Environments
+.travily
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
