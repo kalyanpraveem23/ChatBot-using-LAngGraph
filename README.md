@@ -1,66 +1,186 @@
-Agentic-Chatbot-APP-CICD-Deployment-with-Github-Actions-on-AWS
-Description: About the deployment
-1. Build docker image of the source code
+# 🤖 Agentic Chatbot — CI/CD Deployment with GitHub Actions on AWS
 
-2. Push your docker image to docker hub
+An **Agentic Chatbot application** deployed on **AWS EC2** using **Docker** and an automated **CI/CD pipeline with GitHub Actions**.
 
-3. Launch Your EC2 
+The deployment workflow builds the application into a Docker image, pushes the image to Docker Hub, and deploys the latest image to an AWS EC2 instance.
 
-4. Pull Your image from docker hub in EC2
+---
 
-5. Lauch your docker image in EC2
-1. Login to AWS console.
-2. Create IAM user for deployment
-#Policy:
+## 🚀 Deployment Architecture
 
-1. AmazonEC2FullAccess
-3. Create EC2 machine (Ubuntu)
-4. Open EC2 and Install docker in EC2 Machine:
-#optinal
+```text
+Developer
+   │
+   │ git push
+   ▼
+GitHub Repository
+   │
+   ▼
+GitHub Actions
+   │
+   ├── Build Docker Image   
+   │
+   ├── Login to Docker Hub
+   │
+   ├── Push Docker Image
+   │
+   ▼
+Docker Hub
+   │
+   │ Pull Image
+   ▼
+AWS EC2 (Ubuntu)
+   │
+   ├── Docker Container
+   │
+   └── Port 8501
+   │
+   ▼
+Streamlit Agentic Chatbot
+```
 
+---
+
+# 📌 Project Description
+
+The deployment process consists of the following steps:
+
+1. Build a Docker image from the source code.
+2. Push the Docker image to Docker Hub.
+3. Launch an AWS EC2 Ubuntu instance.
+4. Configure the EC2 instance as a GitHub Actions self-hosted runner.
+5. Pull the Docker image from Docker Hub.
+6. Run the Docker container on the EC2 instance.
+7. Access the Streamlit application through port **8501**.
+
+---
+
+# ☁️ AWS Setup
+
+## 1. Login to AWS Console
+
+Log in to the AWS Management Console.
+
+Create or use an AWS account with permission to create and manage EC2 resources.
+
+---
+
+# 🔐 2. Create IAM User for Deployment
+
+Create an IAM user for deployment.
+
+### Required Policy
+
+For the basic setup described in this project:
+
+```text
+AmazonEC2FullAccess
+```
+
+> ⚠️ **Security recommendation:** For production deployments, avoid using broad permissions such as `AmazonEC2FullAccess`. Use a least-privilege IAM policy containing only the permissions required by your deployment workflow.
+
+Create an access key for the IAM user if your GitHub Actions workflow requires AWS API access.
+
+---
+
+# 🖥️ 3. Create EC2 Instance
+
+Create an EC2 instance with:
+
+* **Operating System:** Ubuntu
+* **Instance Type:** Choose according to your application requirements
+* **Storage:** Configure as required
+* **Security Group:** Allow SSH and application traffic
+
+### Required Ports
+
+| Port | Purpose               |
+| ---: | --------------------- |
+|   22 | SSH                   |
+| 8501 | Streamlit application |
+
+For example:
+
+```text
+TCP 22    → SSH
+TCP 8501  → Streamlit
+```
+
+> ⚠️ Restrict SSH access to your IP address instead of allowing `0.0.0.0/0` whenever possible.
+
+---
+
+# 🐳 4. Install Docker on EC2
+
+Connect to the EC2 instance through SSH.
+
+Update the package list:
+
+```bash
 sudo apt-get update -y
+```
 
-sudo apt-get upgrade
+Optional:
 
-#Install Docker
+```bash
+sudo apt-get upgrade -y
+```
 
+## Install Docker
+
+```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
-
 sudo sh get-docker.sh
+```
 
+Add the Ubuntu user to the Docker group:
+
+```bash
 sudo usermod -aG docker ubuntu
+```
 
+Apply the group changes:
+
+```bash
 newgrp docker
-Note: Do the port mapping to this port:- 8501
-5. Configure EC2 as self-hosted runner:
-setting>actions>runner>new self hosted runner> choose os> then run command one by one
-6. How to add secret keys to GitHub Actions:
-REGISTRY=docker.io
+```
 
-DOCKER_USERNAME=your-dockerhub-username
+Verify Docker:
 
-DOCKER_PASSWORD=your-dockerhub-access-token
+```bash
+docker --version
+```
 
-IMAGE_NAME=agentic-chatbot
+Test Docker:
 
-AWS_ACCESS_KEY_ID=your-aws-access-key
+```bash
+docker run hello-world
+```
 
-AWS_SECRET_ACCESS_KEY=your-aws-secret-key
+---
 
-AWS_REGION=us-east-1
+# 🌐 5. Configure Streamlit Port
 
-OPENAI_API_KEY=your-openai-api-key
+The application runs on:
 
-TAVILY_API_KEY=your-tavily-api-key
+```text
+8501
+```
 
-OPENWEATHER_API_KEY=your-openweather-api-key
+Your Docker container should expose port `8501`.
 
-GOOGLE_API_KEY=your-google-api-key
+Example:
 
-LANGSMITH_TRACING=true
+```bash
+docker run -d -p 8501:8501 agentic-chatbot
+```
 
-LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+The application can then be accessed using:
 
-LANGSMITH_API_KEY=your-langsmith-api-key
+```text
+http://<EC2-PUBLIC-IP>:8501
+```
 
-LANGSMITH_PROJECT=agentic-chatbot-project
+---
+
+# ⚙️ 6. C
