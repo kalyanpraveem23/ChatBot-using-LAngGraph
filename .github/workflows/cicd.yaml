@@ -7,7 +7,6 @@ on:
     paths-ignore:
       - "README.md"
 
-  # Allows you to run the workflow manually
   workflow_dispatch:
 
 # Prevent two deployments from running at the same time
@@ -19,6 +18,7 @@ permissions:
   contents: read
 
 jobs:
+
   # ============================================================
   # 1. CONTINUOUS INTEGRATION
   # ============================================================
@@ -99,12 +99,20 @@ jobs:
     runs-on: self-hosted
 
     steps:
+
+      # --------------------------------------------------------
+      # Docker Hub Login
+      # --------------------------------------------------------
       - name: Log in to Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+
+      # --------------------------------------------------------
+      # Validate Application Secrets
+      # --------------------------------------------------------
       - name: Validate application secrets
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
@@ -114,6 +122,7 @@ jobs:
           LANGSMITH_ENDPOINT: ${{ secrets.LANGSMITH_ENDPOINT }}
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
           LANGSMITH_PROJECT: ${{ secrets.LANGSMITH_PROJECT }}
+
         run: |
           if [ -z "$GOOGLE_API_KEY" ]; then
             echo "GOOGLE_API_KEY secret is missing."
@@ -152,16 +161,30 @@ jobs:
 
           echo "All required application secrets are configured."
 
+
+      # --------------------------------------------------------
+      # Pull Latest Docker Image
+      # --------------------------------------------------------
       - name: Pull latest Docker image
         env:
           IMAGE_PATH: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}
+
         run: |
           docker pull "${IMAGE_PATH}:main"
 
+
+      # --------------------------------------------------------
+      # Stop and Remove Existing Container
+      # --------------------------------------------------------
       - name: Stop and remove existing container
         run: |
-          docker rm -f stapp 2>/dev/null || true
+          docker stop agentic-chatbot 2>/dev/null || true
+          docker rm agentic-chatbot 2>/dev/null || true
 
+
+      # --------------------------------------------------------
+      # Run Streamlit Container
+      # --------------------------------------------------------
       - name: Run Streamlit container
         env:
           IMAGE_PATH: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.IMAGE_NAME }}
@@ -179,7 +202,7 @@ jobs:
         run: |
           docker run -d \
             --restart unless-stopped \
-            --name stapp \
+            --name agentic-chatbot \
             -p 8501:8501 \
             -e OPENAI_API_KEY \
             -e GOOGLE_API_KEY \
@@ -191,47 +214,75 @@ jobs:
             -e LANGSMITH_PROJECT \
             "${IMAGE_PATH}:main"
 
+
+      # --------------------------------------------------------
+      # Verify Container
+      # --------------------------------------------------------
       - name: Verify container is running
         run: |
           sleep 10
 
           if ! docker ps \
-            --filter "name=^stapp$" \
+            --filter "name=^agentic-chatbot$" \
             --filter "status=running" \
-            --format "{{.Names}}" | grep -q "^stapp$"; then
+            --format "{{.Names}}" | grep -q "^agentic-chatbot$"; then
 
             echo "The Streamlit container failed to start."
-            docker logs stapp || true
+
+            docker ps -a
+
+            docker logs agentic-chatbot || true
+
             exit 1
           fi
 
           echo "The Streamlit container is running."
-          docker ps --filter "name=^stapp$"
 
+          docker ps \
+            --filter "name=^agentic-chatbot$"
+
+
+      # --------------------------------------------------------
+      # Streamlit Health Check
+      # --------------------------------------------------------
       - name: Verify Streamlit health endpoint
         run: |
           for attempt in $(seq 1 12); do
-            if docker exec stapp python -c \
+
+            if docker exec agentic-chatbot python -c \
               "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=5)" \
               >/dev/null 2>&1; then
 
               echo "Streamlit application is healthy."
+
               exit 0
             fi
 
             echo "Waiting for Streamlit to become ready..."
+
             sleep 5
+
           done
 
           echo "Streamlit did not become healthy."
-          docker logs --tail 100 stapp || true
+
+          docker logs --tail 100 agentic-chatbot || true
+
           exit 1
 
+
+      # --------------------------------------------------------
+      # Show Application Logs
+      # --------------------------------------------------------
       - name: Show recent application logs
         if: always()
         run: |
-          docker logs --tail 50 stapp 2>/dev/null || true
+          docker logs --tail 50 agentic-chatbot 2>/dev/null || true
 
+
+      # --------------------------------------------------------
+      # Clean Unused Docker Images
+      # --------------------------------------------------------
       - name: Remove unused Docker images
         if: always()
         run: |
